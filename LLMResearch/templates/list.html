@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A²题材智库-题材概览</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用 Inter 字体 */
+        body { font-family: 'Inter', sans-serif; }
+        /* 确保 iframe 填充容器，且没有边框 */
+        #doc-iframe { width: 100%; height: 100%; border: none; }
+        
+        /* --- Sidebar Collapsing Styles --- */
+        /* 使用自定义 CSS 类来定义折叠状态，确保平滑过渡 */
+        #sidebar {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        /* 折叠状态的样式 */
+        #sidebar.is-collapsed {
+            width: 3rem; /* 仅显示切换按钮的小宽度 */
+            padding: 0;
+            overflow: hidden;
+            border-right: 1px solid #e5e7eb; /* 保持一个细小的边框 */
+        }
+        
+        /* 隐藏折叠状态下的内部内容 */
+        #sidebar.is-collapsed #sidebar-content {
+            display: none;
+        }
+
+        /* 调整切换按钮的位置 */
+        #sidebar.is-collapsed #sidebar-toggle {
+            right: 0rem;
+            border-radius: 0.25rem 0 0 0.25rem;
+        }
+        
+        /* 切换按钮图标旋转 */
+        #sidebar.is-collapsed #collapse-icon {
+            transform: rotate(180deg);
+        }
+
+        /* 确保主内容区平滑过渡 */
+        #main-content {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
+
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+    <!-- 侧边栏 - 关键词列表和搜索 (调整为 md:w-72 宽度) -->
+    <aside id="sidebar" class="w-full md:w-72 bg-white p-4 shadow-xl flex-shrink-0 relative">
+        
+        <!-- 切换按钮 -->
+        <button id="sidebar-toggle" 
+                class="absolute top-1/2 -right-4 transform -translate-y-1/2 p-1 bg-indigo-600 text-white rounded-r-lg shadow-lg hidden md:block z-10 hover:bg-indigo-700 transition duration-150">
+            <!-- Icon: Chevron Left (表示折叠) -->
+            <svg id="collapse-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 transition duration-300">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12 15.75 4.5" />
+            </svg>
+        </button>
+
+        <!-- Sidebar 内部内容 -->
+        <div id="sidebar-content">
+            <h1 class="text-2xl font-bold text-indigo-700 mb-4 border-b pb-2">关键词</h1>
+
+            <!-- 搜索输入框 -->
+            <div class="mb-4">
+                <input type="text" id="keyword-search" placeholder="搜索关键词..."
+                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+            </div>
+
+            <!-- 关键词列表 -->
+            <nav id="keyword-list" class="space-y-2 overflow-y-auto max-h-[80vh]">
+                {% for keyword in keywords %}
+                    <a href="#" data-keyword="{{ keyword }}"
+                       class="block p-2 text-gray-700 hover:bg-indigo-100 hover:text-indigo-800 rounded-lg transition duration-150 keyword-item truncate">
+                        {{ keyword }}
+                    </a>
+                {% endfor %}
+            </nav>
+        </div>
+    </aside>
+
+    <!-- 主内容区 - IFRAME 文档展示 -->
+    <main id="main-content" class="flex-grow p-4 bg-gray-100 overflow-hidden">
+        <div class="h-full bg-white rounded-xl shadow-lg p-2">
+            <h2 id="iframe-title" class="text-xl font-semibold text-gray-800 mb-2 p-2 border-b"></h2>
+            <iframe id="doc-iframe" src="{{ url_for('serve_md', keyword=initial_keyword,env=env) if initial_keyword else '' }}"></iframe>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const iframe = document.getElementById('doc-iframe');
+            const iframeTitle = document.getElementById('iframe-title');
+            const searchInput = document.getElementById('keyword-search');
+            const keywordList = document.getElementById('keyword-list');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            
+            // --- 1. 关键词点击事件处理 ---
+            keywordList.addEventListener('click', (e) => {
+                const target = e.target.closest('.keyword-item');
+                if (!target) return;
+
+                e.preventDefault();
+                const keyword = target.dataset.keyword;
+                const url = `/md/${encodeURIComponent(keyword)}`;
+
+                // 更新 iframe 的 src 属性
+                iframe.src = url;
+                // 更新标题
+                iframeTitle.textContent = ` ${keyword}`;
+                
+                // 移除所有链接的激活状态
+                document.querySelectorAll('.keyword-item').forEach(l => l.classList.remove('bg-indigo-200', 'font-bold'));
+                // 为当前点击的链接添加激活状态
+                target.classList.add('bg-indigo-200', 'font-bold');
+            });
+
+
+            // --- 2. 搜索过滤功能 ---
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase().trim();
+
+                document.querySelectorAll('.keyword-item').forEach(link => {
+                    const keyword = link.dataset.keyword.toLowerCase();
+                    // 检查关键词是否包含搜索词，并设置显示/隐藏
+                    if (keyword.includes(searchTerm)) {
+                        link.style.display = 'block';
+                    } else {
+                        link.style.display = 'none';
+                    }
+                });
+            });
+            
+            // --- 3. 侧边栏折叠功能 ---
+            sidebarToggle.addEventListener('click', () => {
+                // 切换 'is-collapsed' 类来触发 CSS 动画
+                sidebar.classList.toggle('is-collapsed');
+            });
+
+
+            // --- 4. 初始状态设置 ---
+            const initialKeyword = "{{ initial_keyword }}";
+            if (initialKeyword) {
+                const initialLink = document.querySelector(`.keyword-item[data-keyword="${initialKeyword}"]`);
+                if (initialLink) {
+                    initialLink.classList.add('bg-indigo-200', 'font-bold');
+                    iframeTitle.textContent = ` ${initialKeyword}`;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
